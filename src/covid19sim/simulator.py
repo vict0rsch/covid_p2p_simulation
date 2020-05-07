@@ -1,5 +1,6 @@
 from collections import deque
 import os
+import warnings
 
 from covid19sim.frozen.clusters import Clusters
 from covid19sim.frozen.utils import create_new_uid, Message, UpdateMessage, encode_message, encode_update_message
@@ -113,7 +114,7 @@ class Human(object):
         self.initial_viral_load = self.rng.rand() if infection_timestamp is not None else 0
         if self.infection_timestamp is not None:
             self.compute_covid_properties()
-            print(f"{self} is infected")
+            print(f"{self} is infected. has_app:{self.has_app}")
 
         # counters and memory
         self.r0 = []
@@ -157,7 +158,8 @@ class Human(object):
         self.update_messages = []
         self.clusters = Clusters()
         self.tested_positive_contact_count = 0
-        self.infectiousnesses = []
+        # Padding the array
+        self.infectiousnesses = deque([0] * TRACING_N_DAYS_HISTORY, maxlen=TRACING_N_DAYS_HISTORY)
         self.uid = create_new_uid(rng)
         self.exposure_message = None
         self.exposure_source = None
@@ -171,6 +173,9 @@ class Human(object):
         self.cold_progression = _get_cold_progression(self.age, self.rng, self.carefulness, self.preexisting_conditions, self.can_get_really_sick, self.can_get_extremely_sick)
         self.flu_progression = _get_flu_progression(self.age, self.rng, self.carefulness, self.preexisting_conditions, self.can_get_really_sick, self.can_get_extremely_sick)
         self.all_symptoms, self.cold_symptoms, self.flu_symptoms, self.covid_symptoms, self.allergy_symptoms = [], [], [], [], []
+        # Padding the array
+        self.rolling_all_symptoms = deque([tuple()] * TRACING_N_DAYS_HISTORY, maxlen=TRACING_N_DAYS_HISTORY)
+        self.rolling_all_reported_symptoms = deque([tuple()] * TRACING_N_DAYS_HISTORY, maxlen=TRACING_N_DAYS_HISTORY)
 
         # habits
         self.avg_shopping_time = _draw_random_discreet_gaussian(AVG_SHOP_TIME_MINUTES, SCALE_SHOP_TIME_MINUTES, self.rng)
@@ -280,7 +285,7 @@ class Human(object):
 
     @property
     def is_removed(self):
-        return self.recovered_timestamp == datetime.datetime.max
+        return self.is_immune or self.recovered_timestamp == datetime.datetime.max
 
     @property
     def is_incubated(self):
@@ -377,33 +382,32 @@ class Human(object):
 
     @property
     def obs_symptoms(self):
-        if not self.has_app:
-            return []
-        reported_symptoms = []
-        for symptom in self.all_symptoms:
-            if self.rng.random() < self.carefulness:
-                reported_symptoms.append(symptom)
-        return reported_symptoms
+        warnings.warn("Deprecated in favor of Human.all_reported_symptoms()", DeprecationWarning)
+        return self.all_reported_symptoms
 
     @property
     def symptoms(self):
-        if self.last_date['symptoms'] != self.env.timestamp.date():
-            self.last_date['symptoms'] = self.env.timestamp.date()
-            self.update_symptoms()
-        return self.all_symptoms
+        # TODO: symptoms should not be updated here.
+        #  Explicit call to Human.update_symptoms() should be required
+        self.update_symptoms()
+        return self.rolling_all_symptoms[0]
 
     @property
     def all_reported_symptoms(self):
         if not self.has_app:
             return []
 
-        reported_symptoms = []
-        for symptom in self.all_symptoms:
-            if self.rng.random() < self.carefulness:
-                reported_symptoms.append(symptom)
-        return reported_symptoms
+        # TODO: symptoms should not be updated here.
+        #  Explicit call to Human.update_reported_symptoms() should be required
+        self.update_reported_symptoms()
+        return self.rolling_all_reported_symptoms[0]
 
     def update_symptoms(self):
+        if self.last_date['symptoms'] == self.env.timestamp.date():
+            return
+
+        self.last_date['symptoms'] = self.env.timestamp.date()
+
         if self.cold_timestamp is not None:
             t = self.days_since_cold
             if t < len(self.cold_progression):
@@ -430,7 +434,25 @@ class Human(object):
 
         all_symptoms = set(self.flu_symptoms + self.cold_symptoms + self.allergy_symptoms + self.covid_symptoms)
         # self.new_symptoms = list(all_symptoms - set(self.all_symptoms))
+        # TODO: remove self.all_symptoms in favor of self.rolling_all_symptoms[0]
         self.all_symptoms = list(all_symptoms)
+
+        self.rolling_all_symptoms.appendleft(self.all_symptoms)
+
+        # Keep reported symptoms in sync
+        # TODO: Inconsistency could come from Human.symptoms being accessed instead of Human.all_symptoms
+        self.update_reported_symptoms()
+
+    def update_reported_symptoms(self):
+        self.update_symptoms()
+
+        if self.last_date['reported_symptoms'] == self.env.timestamp.date():
+            return
+
+        self.last_date['reported_symptoms'] = self.env.timestamp.date()
+
+        reported_symptoms = [s for s in self.rolling_all_symptoms[0] if self.rng.random() < self.carefulness]
+        self.rolling_all_reported_symptoms.appendleft(reported_symptoms)
 
     def compute_covid_properties(self):
         self.viral_load_plateau_height, \
@@ -585,12 +607,20 @@ class Human(object):
                 self.count_shop=0
 
             if self.last_date['run'] != self.env.timestamp.date():
+                # Pad missing days
+                missing_days = (self.env.timestamp.date() - self.last_date['run']).days - 1
+                if missing_days:
+                    warnings.warn(f"Missed {missing_days} update days on {self.name}. "
+                                  f"Current day {self.env.timestamp}, "
+                                  f"last_date['run'] {self.last_date['run']}",
+                                  RuntimeWarning)
+                    for day in range(missing_days):
+                        self.infectiousnesses.appendleft(0)
                 self.last_date['run'] = self.env.timestamp.date()
                 self.update_symptoms()
+                self.update_reported_symptoms()
                 self.update_risk(symptoms=self.symptoms)
-                self.infectiousnesses.append(self.infectiousness)
-                if len(self.infectiousnesses) > TRACING_N_DAYS_HISTORY:
-                    self.infectiousnesses.pop(-1)
+                self.infectiousnesses.appendleft(self.infectiousness)
                 Event.log_daily(self, self.env.timestamp)
                 city.tracker.track_symptoms(self)
 
@@ -640,7 +670,7 @@ class Human(object):
                     self.dead = True
                 else:
                     if not REINFECTION_POSSIBLE:
-                        self.recovered_timestamp = datetime.datetime.max
+                        self.recovered_timestamp = self.env.timestamp
                         self.is_immune = not REINFECTION_POSSIBLE
                     else:
                         self.recovered_timestamp = self.env.timestamp
@@ -1066,7 +1096,7 @@ class Human(object):
                 del state['_workplace']
 
         # add a stand-in for property
-        state["all_reported_symptoms"] = self.all_reported_symptoms
+        # state["all_reported_symptoms"] = self.all_reported_symptoms
         return state
 
     def __setstate__(self, state):
@@ -1170,6 +1200,8 @@ class Human(object):
                     self.city.hd[message.unobs_id].contact_book.update_messages.append(update_message)
                     self.contact_book.sent_messages_by_day[day][idx] = Message(my_old_message.uid, new_risk_level, my_old_message.day, my_old_message.unobs_id)
 
+                    self.city.tracker.track_update_messages(self, self.city.hd[message.unobs_id], new_risk_level)
+
         if cur_day in self.prev_risk_history_map.keys():
             new_risk_level = min(_proba_to_risk_level(self.risk_history_map[cur_day]), 15)
             prev_risk_level = min(_proba_to_risk_level(self.prev_risk_history_map[cur_day]), 15)
@@ -1179,8 +1211,8 @@ class Human(object):
     def update_risk(self, recovery=False, test_results=False, update_messages=None, symptoms=None):
         if not self.tracing or self.tracing_method.risk_model == "transformer":
             return
-        cur_day = (self.env.timestamp - self.env.initial_timestamp).days
 
+        cur_day = (self.env.timestamp - self.env.initial_timestamp).days
         if recovery:
             if self.is_removed:
                 self.risk = 0.0
