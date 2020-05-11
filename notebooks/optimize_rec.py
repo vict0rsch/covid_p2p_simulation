@@ -379,9 +379,10 @@ if __name__ == "__main__":
             histograms[yb].append(r["risk_level" if opts.risk_levels else "risk"])
             true_histograms[yt].append(r["risk_level" if opts.risk_levels else "risk"])
 
-    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4)
+    fig, axes = plt.subplots(4)
+    ax1, ax2, ax3, ax4 = axes
     for hist in [3, 0, 2, 1]:
-        for i, ax in enumerate([ax1, ax2, ax3, ax4]):
+        for i, ax in enumerate(axes):
             if i > 1:
                 print("plot histograms", hist, id_to_color[hist].lower())
                 if opts.bar:
@@ -417,7 +418,7 @@ if __name__ == "__main__":
     ax2.set_yscale("log")
     ax4.set_yscale("log")
 
-    for i, ax in enumerate([ax1, ax2, ax3, ax4]):
+    for i, ax in enumerate(axes):
         if i == 0:
             ax.set_title(
                 "{} Reports (1 / human / hour)  |  Thresholds: {:.3f} {:.3f} {:.3f} | {} {:.3f}".format(
