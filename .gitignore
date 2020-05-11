@@ -1,3 +1,6 @@
+# html files
+*.html
+
 # images and data files
 *.png
 *.gif
@@ -6,7 +9,7 @@
 *.DS_Store
 # output files
 output/
-CTT-SHIPMENT-0/
+CTT-SHIPMENT-0
 
 # Pycharm stuff
 .idea/
