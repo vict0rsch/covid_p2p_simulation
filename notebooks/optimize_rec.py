@@ -49,7 +49,7 @@ def report(y_true, y_pred, score):
     s += "\n{}\n{}\n".format(cm, cr)
     s += "{:.3f} f1_weighted".format(f1_weighted) + "\n"
     s += "{:.3f} f1_mic".format(f1_mic) + "\n"
-    s += "{:.3f} f1_mic".format(f1_mac) + "\n"
+    s += "{:.3f} f1_mac".format(f1_mac) + "\n"
     s += "=> NEW best score, for threshold {}: {}\n".format(model, score)
     s += ">>> ----------------------------------------------------- <<<\n\n"
     return s
@@ -156,9 +156,9 @@ def predict_color_id(risks, thresholds):
     Get the color_id prediction for the risks according to thresholds:
 
         risk < thresholds[0] => 0
-        risk >= thresholds[1] => 1
-        risk >= thresholds[2] => 2
-        risk >= thresholds[3] => 3
+        risk >= thresholds[0] => 1
+        risk >= thresholds[1] => 2
+        risk >= thresholds[2] => 3
 
     Args:
         risks (list): float, risks
@@ -169,7 +169,7 @@ def predict_color_id(risks, thresholds):
     """
     predictions = np.zeros_like(risks)
     for i, r in enumerate(thresholds):
-        predictions[risks >= r] = i + 1
+        predictions[risks > r] = i + 1
     return predictions.astype(int)
 
 
@@ -223,18 +223,16 @@ if __name__ == "__main__":
     # -----  Constants  -----
     # -----------------------
     ptrace = pdb.set_trace  # debug only
-    filename = "/Users/victor/Downloads/tracker_data_n_200_seed_0_20200509-090220_.pkl"
+    filename = "/Users/victor/Downloads/tracker_data_n_300_seed_0_20200511-202514_transformer_no_modif.pkl"
     category_to_color = {
         "A": "RED",
         "B": "RED",
         "C": "RED",
         "D": "RED",
         "E": "YELLOW",
-        "F": "RED",
-        "G": "RED",
-        "H": "ORANGE",
+        "H": "YELLOW",
         "I": "ORANGE",
-        "J": "RED",
+        "J": "ORANGE",
         "K": "GREEN",
     }
     costs_for_category = {
@@ -243,8 +241,6 @@ if __name__ == "__main__":
         "C": 2,
         "D": 2,
         "E": 1,
-        "F": 1,
-        "G": 1,
         "H": 1,
         "I": 1,
         "J": 1.5,
@@ -252,6 +248,28 @@ if __name__ == "__main__":
     }
     color_to_id = {"GREEN": 0, "YELLOW": 1, "ORANGE": 2, "RED": 3}
     id_to_color = {v: k for k, v in color_to_id.items()}
+    risk_level_mapping = [
+        0.0,
+        0.0001,
+        0.02790058831805188,
+        0.056507214366051786,
+        0.09964329702354373,
+        0.12181110126553577,
+        0.18458727162787497,
+        0.28600519445013506,
+        0.3628629063698628,
+        0.44121387005841506,
+        0.4954098649943365,
+        0.5819137774823899,
+        0.6232547997952577,
+        0.7266351205574721,
+        0.8874807435526698,
+        1.0,
+        1.065126768029105,
+    ]
+
+    def proba_to_risk(probas, mapping):
+        return np.maximum(np.searchsorted(mapping, probas, side="left") - 1, 0)
 
     # -----------------------------
     # -----  Parse Arguments  -----
@@ -260,12 +278,15 @@ if __name__ == "__main__":
     parser.add_argument("--data", type=str, default=filename)
     parser.add_argument("--score", type=str, default="error")
     parser.add_argument("--samples", type=int, default=100)
+    parser.add_argument("--day", type=int, default=0)
     parser.add_argument("--bins", type=int, default=100)
     parser.add_argument("--risk_levels", default=False, action="store_true")
     parser.add_argument("--interactive", default=False, action="store_true")
     parser.add_argument("--bar", default=False, action="store_true")
     parser.add_argument("--plot_model", default="", type=str)
     opts = parser.parse_args()
+
+    day = opts.day
 
     assert Path(opts.data).exists()
     assert opts.samples > 0
@@ -300,7 +321,21 @@ if __name__ == "__main__":
         "\n".join("{:35}: {}".format(k, data_str(v)) for k, v in sorted(data.items()))
     )
 
-    risk_attributes = data["risk_attributes"]
+    start_stamp = data["risk_attributes"][0]["timestamp"]
+    risk_attributes = [
+        r
+        for r in data["risk_attributes"]
+        if (r["timestamp"] - start_stamp).days >= day
+        and (r["timestamp"] - start_stamp).days < (day + 1 if day else 1e12)
+        and get_category(r) not in set(["A", "E"])
+    ]
+
+    # _risk_attributes = []
+    # for r in risk_attributes:
+    #     r["risk_level"] = proba_to_risk(r["risk"], risk_level_mapping)
+    #     _risk_attributes.append(r)
+    # risk_attributes = _risk_attributes
+
     categories = [get_category(r) for r in risk_attributes]
     colors = [category_to_color[c] for c in categories]
     y_true = np.array([color_to_id[c] for c in colors])
@@ -389,7 +424,7 @@ if __name__ == "__main__":
                     ax.bar(
                         histograms[hist].keys(),
                         histograms[hist].values() or [0],
-                        width=0.004,
+                        width=0.1,
                         color=id_to_color[hist].lower(),
                     )
                 else:
@@ -405,7 +440,7 @@ if __name__ == "__main__":
                     ax.bar(
                         true_histograms[hist].keys(),
                         true_histograms[hist].values() or [0],
-                        width=0.005 * (4 - hist),
+                        width=0.1 * (4 - hist),
                         color=id_to_color[hist].lower(),
                     )
                 else:
@@ -494,4 +529,4 @@ if __name__ == "__main__":
 
         button.on_clicked(reset)
 
-    plt.show()
+    plt.show(block=False)
