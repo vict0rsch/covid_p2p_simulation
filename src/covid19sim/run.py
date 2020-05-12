@@ -189,6 +189,8 @@ def tune(n_people, init_percent_sick, simulation_days, seed, outdir, config, n_j
     #
     # tracker.plot_metrics(dirname="plots/tune")
 
+    print(">>> DONE TUNE SEED {}".format(seed))
+
 def run_simu(n_people=None,
              init_percent_sick=0.01,
              start_time=datetime.datetime(2020, 2, 28, 0, 0),
