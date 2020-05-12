@@ -184,7 +184,7 @@ INFECTION_DURATION_FACTOR = 0.0
 # capacity is per day; time_to_result is per day
 TEST_TYPES = {
     "lab": {
-        "capacity": 100,
+        "capacity": 2,
         "time_to_result":2,
         "P_FALSE_NEGATIVE":0.1, #&false-negative,
         "preference":1
