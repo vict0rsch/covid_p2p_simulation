@@ -196,19 +196,21 @@ INFECTION_DURATION_FACTOR = 0.0
 
 #TESTING
 # capacity is per day; time_to_result is per day
+P_TEST = 0.001 # proportion of population that is tested DAILY (in Canada, ~= 40 000 tests a day)
 TEST_TYPES = {
     "lab": {
-        "capacity": 100,
-        "time_to_result":2,
-        "P_FALSE_NEGATIVE":0.1, #&false-negative,
-        "preference":1
+        "capacity": P_TEST, # ! /!\ This is now a proportion of population, not an absolute (int) value
+        "time_to_result": 2,
+        "P_FALSE_NEGATIVE": 0.1, #&false-negative,
+        "preference": 1
     }
 }
-
-P_TEST = 0.3
 P_TEST_SYMPTOMATIC = 0.3
 P_TEST_ASYMPTOMATIC = 0.05
 TEST_DAYS = 5
+TEST_INTERVAL = 10  # someone cannot get tested twice within TEST_INTERVAL days
+                    # (0 => someone may be tested several times a day, 1 =>  cannot be tested until the next day etc.)
+                    # Setting to fairly high value since people generally don't get re-tested except for specific professional situations
 
 # VIRAL LOAD PARAMS
 MIN_VIRAL_LOAD = 0.1
@@ -315,7 +317,7 @@ MIN_DIST_ENCOUNTER = 20
 MAX_DIST_ENCOUNTER = 200
 
 # KNOBS
-CONTAGION_KNOB = 1.85
+CONTAGION_KNOB = 1.85 # lower, more infections
 ENVIRONMENTAL_INFECTION_KNOB = 0.0005
 GREEN_FEELING_KNOB = 1.0
 

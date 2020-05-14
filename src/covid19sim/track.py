@@ -528,8 +528,10 @@ class Tracker(object):
         """
         if test_result == "positive":
             self.cases_positive_per_day[-1] += 1
+
         self.test_monitor.append({
-            "human": human,
+            "name": human.name,
+            "symptoms": list(human.symptoms),
             "timestamp": human.env.timestamp,
             "type": test_type,
             "result": test_result
