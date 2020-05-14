@@ -778,16 +778,25 @@ class Human(object):
         Returns:
             [type]: [description]
         """
+
+        test_log = {
+            "timestamp": city.env.timestamp
+        }
+
         if not city.tests_available:
             return False
 
         # TODO: get observed data on testing / who gets tested when??
         if any(self.symptoms) and self.rng.rand() < P_TEST:
+            test_log["human"] = self.name
             self.test_type = city.get_available_test()
             if self.rng.rand() < TEST_TYPES[self.test_type]['P_FALSE_NEGATIVE']:
                 self.test_result =  'negative'
             else:
                 self.test_result =  'positive'
+
+            test_log["type"] = test_type
+            test_log["result"] = self.test_result
 
             if self.test_type == "lab":
                 self.test_result_validated = True
@@ -800,6 +809,8 @@ class Human(object):
             else:
                 self.reported_test_result = None
                 self.reported_test_type = None
+
+            city.tracker.test_monitor.append(test_log)
 
             return True
 
@@ -888,11 +899,11 @@ class Human(object):
         return 1.0
 
     def expire(self):
-        """ 
+        """
         This function (generator) will cause the human to expire, after which self.is_dead==True.
         Yields self.env.timeout(np.inf), which when passed to env.procces will inactivate self
         for the remainder of the simulation.
-        
+
         Yields:
             generator
         """
@@ -1026,12 +1037,12 @@ class Human(object):
                 yield self.env.process(self.excursion(city, "hospital"))
 
             # Work is a partial imperitive
-            if (not self.profession=="retired" and 
+            if (not self.profession=="retired" and
                 not self.env.is_weekend() and
                 hour in self.work_start_hour and
                 not self.rest_at_home):
                 yield self.env.process(self.excursion(city, "work"))
-                
+
             # TODO (EM) These optional and erratic behaviours should be more probabalistic,
             # with probs depending on state of lockdown of city
             # Lockdown should also close a fraction of the shops
@@ -1131,7 +1142,7 @@ class Human(object):
                 # If we make it here, it counts as a visit to the shop
                 self.count_shop+=1
                 yield self.env.process(self.at(grocery_store, city, t))
-        
+
         elif location_type == "exercise":
             park = self._select_location(location_type="park", city=city)
             if park is None:
@@ -1145,7 +1156,7 @@ class Human(object):
             t = _draw_random_discreet_gaussian(self.avg_working_minutes, self.scale_working_minutes, self.rng)
             if self.workplace.is_open_for_business:
                 yield self.env.process(self.at(self.workplace, city, t))
-            else: 
+            else:
                 # work from home
                 yield self.env.process(self.at(self.household, city, t))
 
@@ -1459,7 +1470,7 @@ class Human(object):
             return loc
         else:
             return None
-        
+
 
     def get_message_dict(self):
         """

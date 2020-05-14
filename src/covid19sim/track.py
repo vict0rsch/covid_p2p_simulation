@@ -143,6 +143,7 @@ class Tracker(object):
         # monitors
         self.human_monitor = {}
         self.infection_monitor = []
+        self.test_monitor = []
 
         # update messages
         self.infector_infectee_update_messages = defaultdict(lambda :defaultdict(dict))
