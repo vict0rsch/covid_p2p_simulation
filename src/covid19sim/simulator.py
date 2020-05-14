@@ -11,7 +11,7 @@ from orderedset import OrderedSet
 
 from covid19sim.interventions import Tracing
 from covid19sim.utils import compute_distance, proba_to_risk_fn
-from covid19sim.base import Event, Contacts
+from covid19sim.base import Event, Contacts, Hospital, ICU
 from covid19sim.configs.config import *
 from collections import deque
 
@@ -591,6 +591,14 @@ class Human(object):
         """
         return self.can_get_extremely_sick and 'severe' in self.symptoms
 
+    @property
+    def should_get_tested(self): # TODO Prateek + Victor
+        TEST_SYMPTOMS_FOR_HOSPITAL = {"cough", "fever", "trouble_breathing"}
+        if isinstance(self.location, (Hospital, ICU)):
+            return self.is_really_sick or (TEST_SYMPTOMS_FOR_HOSPITAL & set(self.symptoms))
+
+        return False
+
     def viral_load_for_day(self, timestamp):
         """ Calculates the elapsed time since infection, returning this person's current viral load"""
         if not self.infection_timestamp:
@@ -970,8 +978,15 @@ class Human(object):
                     self.is_incubated and self.env.timestamp - self.symptom_start_time >= datetime.timedelta(days=TEST_DAYS)
                 )
             )):
+                if 0<= (self.env.timestamp - self.test_time).days < TEST_INTERVAL:
+                        warnings.warn(
+                            f"{self.name}'s last test time is less than {TEST_INTERVAL} days. Will not retest human today. "
+                            f"Current day {self.env.timestamp}, "
+                            f"Last test time {self.test_time}",
+                            RuntimeWarning
+                        )
                 # make testing a function of age/hospitalization/travel
-                if self.get_tested(city):
+                elif self.get_tested(city):
                     Event.log_test(self, self.env.timestamp)
                     self.test_time = self.env.timestamp
                     city.tracker.track_tested_results(self, self.test_result, self.test_type)
@@ -1226,6 +1241,9 @@ class Human(object):
         self.start_time = self.env.now
         area = self.location.area
         initial_viral_load = 0
+
+        if self.should_get_tested: # check for location is ICU or Hospital + symptoms
+            self.get_tested(city)
 
         # accumulate time at household
         if location == self.household:
