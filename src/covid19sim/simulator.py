@@ -779,24 +779,16 @@ class Human(object):
             [type]: [description]
         """
 
-        test_log = {
-            "timestamp": city.env.timestamp
-        }
-
         if not city.tests_available:
             return False
 
         # TODO: get observed data on testing / who gets tested when??
         if any(self.symptoms) and self.rng.rand() < P_TEST:
-            test_log["human"] = self.name
             self.test_type = city.get_available_test()
             if self.rng.rand() < TEST_TYPES[self.test_type]['P_FALSE_NEGATIVE']:
                 self.test_result =  'negative'
             else:
                 self.test_result =  'positive'
-
-            test_log["type"] = test_type
-            test_log["result"] = self.test_result
 
             if self.test_type == "lab":
                 self.test_result_validated = True
@@ -809,9 +801,6 @@ class Human(object):
             else:
                 self.reported_test_result = None
                 self.reported_test_type = None
-
-            city.tracker.test_monitor.append(test_log)
-
             return True
 
         return False
@@ -976,9 +965,11 @@ class Human(object):
 
             # log test
             # TODO: needs better conditions; log test based on some condition on symptoms
-            if (self.test_result != "positive" and
-                (self.test_recommended or
-                (self.is_incubated and self.env.timestamp - self.symptom_start_time >= datetime.timedelta(days=TEST_DAYS)))):
+            if (self.test_result != "positive" and (
+                self.test_recommended or (
+                    self.is_incubated and self.env.timestamp - self.symptom_start_time >= datetime.timedelta(days=TEST_DAYS)
+                )
+            )):
                 # make testing a function of age/hospitalization/travel
                 if self.get_tested(city):
                     Event.log_test(self, self.env.timestamp)

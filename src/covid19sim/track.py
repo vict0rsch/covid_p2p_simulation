@@ -528,6 +528,12 @@ class Tracker(object):
         """
         if test_result == "positive":
             self.cases_positive_per_day[-1] += 1
+        self.test_monitor.append({
+            "human": human,
+            "timestamp": human.env.timestamp,
+            "type": test_type,
+            "result": test_result
+        })
 
     def track_recovery(self, n_infectious_contacts, duration):
         """
