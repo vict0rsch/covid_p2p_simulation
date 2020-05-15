@@ -136,7 +136,7 @@ def simulate(n_people=None,
 
     env.run(until=simulation_days * 24 * 60 / TICK_MINUTE)
 
-    return monitors, city.tracker
+    return monitors, city.tracker, city
 
 
 if __name__ == "__main__":

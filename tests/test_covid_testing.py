@@ -27,7 +27,9 @@ def print_dict(title, dic, is_sorted=None):
     aligned = "{:" + str(ml) + "}"
     print(
         "{}:\n   ".format(title),
-        "\n    ".join((aligned + ": {}").format(k, v) for k, v in items),
+        "\n    ".join((aligned + ": {}").format(k, v) for k, v in items)
+        if items
+        else "<No data>",
     )
 
 
@@ -68,11 +70,11 @@ if __name__ == "__main__":
     # ----------------------------
     # -----  Run Simulation  -----
     # ----------------------------
-    n_people = 10000
-    simulation_days = 30
+    n_people = 100
+    simulation_days = 60
     init_percent_sick = 0.01
     start_time = datetime.datetime(2020, 2, 28, 0, 0)
-    monitors, tracker = simulate(
+    monitors, tracker, city = simulate(
         n_people=n_people,
         start_time=start_time,
         simulation_days=simulation_days,
@@ -94,7 +96,7 @@ if __name__ == "__main__":
     # -------------------------
     # -----  Daily Stats  -----
     # -------------------------
-    cum_R = np.cumsum(data["r"])
+    cum_removed = data["r"]
     i_for_day = {days[i]: d for i, d in enumerate(data["i"])}
 
     # ------------------------------
@@ -114,7 +116,10 @@ if __name__ == "__main__":
     )
     positives = len([m for m in tm if m["result"] == "positive"])
     negatives = len([m for m in tm if m["result"] == "negative"])
-    positive_rate = positives / (negatives + positives)
+    if negatives + positives:
+        positive_rate = positives / (negatives + positives)
+    else:
+        positive_rate = "Warning: no test done"
 
     # ----------------------------
     # -----  Multiple Tests  -----
@@ -142,10 +147,17 @@ if __name__ == "__main__":
     # -----  Prints  -----
     # --------------------
     print("\n" + "-" * 50 + "\n" + "-" * 50)
-    print("Cumulative removed per day: ", cum_R)
+    print("Cumulative removed per day: ", cum_removed)
     print("Test events: ", len(tm))
     print("Individuals: ", len(set(m["name"] for m in tm)))
     print_dict("Tests per day", tests_per_day)
+    if any(v > city.max_capacity_per_test_type["lab"] for v in tests_per_day.values()):
+        print(">>> ----- WARNING ----- <<<")
+        print(
+            " There are days with abnormal number of tests (max cap = {})\n".format(
+                city.max_capacity_per_test_type["lab"]
+            )
+        )
     print(
         "Results last day ( N | P | P / (N+P) ): ", negatives, positives, positive_rate
     )
