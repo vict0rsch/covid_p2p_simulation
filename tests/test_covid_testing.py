@@ -62,17 +62,16 @@ if __name__ == "__main__":
     # https://coronavirus.jhu.edu/testing/testing-positivity
     # https://www.canada.ca/content/dam/phac-aspc/documents/services/diseases/2019-novel-coronavirus-infection/surv-covid19-epi-update-eng.pdf
     path = Path(__file__).parent
-    ExpConfig.load_config(
-        path / "test_configs" / "test_covid_test.yml"
-    )  # test_covid_test = no intervention
+    # test_covid_test = no intervention
+    ExpConfig.load_config(path / "test_configs" / "test_covid_test.yml")
     outfile = None
 
     # ----------------------------
     # -----  Run Simulation  -----
     # ----------------------------
-    n_people = 100
-    simulation_days = 60
-    init_percent_sick = 0.01
+    n_people = 1000
+    simulation_days = 30
+    init_percent_sick = 0.001
     start_time = datetime.datetime(2020, 2, 28, 0, 0)
     monitors, tracker, city = simulate(
         n_people=n_people,
