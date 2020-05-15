@@ -10,7 +10,7 @@ import networkx as nx
 import datetime
 import dill
 import copy
-
+from pathlib import Path
 from covid19sim.configs.config import HUMAN_DISTRIBUTION, LOCATION_DISTRIBUTION, INFECTION_RADIUS, EFFECTIVE_R_WINDOW
 from covid19sim.utils import log
 from covid19sim.configs.exp_config import ExpConfig
@@ -933,5 +933,7 @@ class Tracker(object):
         data['infection_monitor'] = self.infection_monitor
         data['infector_infectee_update_messages'] = self.infector_infectee_update_messages
 
-        with open(f"logs3/{self.filename}", 'wb') as f:
+        dump_dir = Path("./logs3")
+        dump_dir.mkdir(exist_ok=True)
+        with open(dump_dir / self.filename, 'wb') as f:
             dill.dump(data, f)

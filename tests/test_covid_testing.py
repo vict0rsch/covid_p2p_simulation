@@ -23,7 +23,7 @@ def print_dict(title, dic, is_sorted=None):
         items = sorted(dic.items(), key=lambda x: x[1])
         if is_sorted == "desc":
             items = reversed(items)
-    ml = max(len(k) for k in dic.keys()) + 2
+    ml = max([len(k) for k in dic.keys()] + [0]) + 2
     aligned = "{:" + str(ml) + "}"
     print(
         "{}:\n   ".format(title),
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     # ----------------------------
     # -----  Run Simulation  -----
     # ----------------------------
-    n_people = 1000
+    n_people = 10000
     simulation_days = 30
     init_percent_sick = 0.01
     start_time = datetime.datetime(2020, 2, 28, 0, 0)
