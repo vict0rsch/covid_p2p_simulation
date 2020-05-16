@@ -48,6 +48,11 @@ def main(n_people=None,
     """
 
     # Load the experimental configuration
+    title = f">> Loading Configuration {config} <<"
+    print('-' * len(title))
+    print(title)
+    print('-' * len(title))
+
     ExpConfig.load_config(config)
     if outdir is None:
         outdir = "output"
