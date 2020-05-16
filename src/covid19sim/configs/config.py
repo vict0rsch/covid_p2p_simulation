@@ -199,12 +199,15 @@ INFECTION_DURATION_FACTOR = 0.0
 P_TEST = 0.001 # proportion of population that is tested DAILY (in Canada, ~= 40 000 tests a day)
 TEST_TYPES = {
     "lab": {
-        "capacity": P_TEST, # ! /!\ This is now a proportion of population, not an absolute (int) value
+        "capacity": P_TEST * 10, # ! /!\ This is now a proportion of population, not an absolute (int) value
         "time_to_result": 2,
-        "P_FALSE_NEGATIVE": 0.1, #&false-negative,
+        "P_FALSE_NEGATIVE": 0.2, #&false-negative,
+        "P_FALSE_POSITIVE": 0.05, #&false-negative,
         "preference": 1
     }
 }
+P_TEST_MILD = 0.1
+P_TEST_MODERATE = 0.4
 P_TEST_SYMPTOMATIC = 0.3
 P_TEST_ASYMPTOMATIC = 0.05
 TEST_DAYS = 5
@@ -243,17 +246,17 @@ BASELINE_P_ASYMPTOMATIC = 0.20 # &p-asymptomatic
 ASYMPTOMATIC_INFECTION_RATIO = 0.2 # &prob_infectious
 
 # SEASONAL ALLERGIES
-P_ALLERGIES = 0.001
+P_ALLERGIES = 0.00
 P_SEVERE_ALLERGIES = 0.02
 P_HAS_ALLERGIES_TODAY = 0.0
 
 # OTHER TRANSMISSIBLE DISEASES
-P_FLU = 0.001 # &p-flu
+P_FLU = 0.00 # &p-flu
 FLU_CONTAGIOUSNESS = 0.05
 FLU_INCUBATION = 1
 AVG_FLU_DURATION = 5
 
-P_COLD = 0.001 # &p-cold
+P_COLD = 0.00 # &p-cold
 COLD_CONTAGIOUSNESS = 0.05
 COLD_INCUBATION = 1
 AVG_COLD_DURATION = 3

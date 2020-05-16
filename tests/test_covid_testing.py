@@ -70,8 +70,8 @@ if __name__ == "__main__":
     # -----  Run Simulation  -----
     # ----------------------------
     n_people = 1000
-    simulation_days = 30
-    init_percent_sick = 0.001
+    simulation_days = 60
+    init_percent_sick = 0.002
     start_time = datetime.datetime(2020, 2, 28, 0, 0)
     monitors, tracker, city = simulate(
         n_people=n_people,

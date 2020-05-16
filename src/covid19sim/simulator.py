@@ -613,10 +613,39 @@ class Human(object):
         return self.can_get_extremely_sick and 'severe' in self.symptoms
 
     @property
-    def should_get_tested(self): # TODO Prateek + Victor
+    def should_get_tested(self):
+        # has been tested positive already
+        if self.test_result == "positive":
+            return False
+        # has been tested negative too recently
+        if (
+            self.test_result == "negative"
+            and (self.env.timestamp - self.test_time).days < TEST_INTERVAL
+        ):
+            return False
+
+        # Is in a hospital and has hospital-specific symptoms
         TEST_SYMPTOMS_FOR_HOSPITAL = {"cough", "fever", "trouble_breathing"}
         if isinstance(self.location, (Hospital, ICU)):
             return self.is_really_sick or (TEST_SYMPTOMS_FOR_HOSPITAL & set(self.symptoms))
+
+        # has been recommended the test by an intervention
+        if self.test_recommended:
+            return True # ? TODO modulate with follow recommendations?
+
+        if "severe" in self.symptoms:
+            return True
+
+        if "moderate" in self.symptoms:
+            return self.rng.rand() < P_TEST_MODERATE
+
+        if "mild" in self.symptoms:
+            return self.rng.rand() < P_TEST_MILD
+
+        # Has symptoms that a careful person would fear to be covid
+        SUSPICIOUS_SYMPTOMS = {"cough", "fever", "trouble_breathing"}
+        if set(self.symptoms) & SUSPICIOUS_SYMPTOMS:
+            return self.rng.rand() < self.carefulness
 
         return False
 
@@ -798,7 +827,9 @@ class Human(object):
 
     def get_tested(self, city, source="illness"):
         """
-        [summary]
+        If the City has tests and Human has symptoms, there's a probability
+        P_TEST that the person will be tested. With probability
+        P_FALSE_NEGATIVE the test will be negative, otherwise it will be positive
 
         Args:
             city ([type]): [description]
@@ -811,13 +842,20 @@ class Human(object):
         if not city.tests_available:
             return False
 
+        # import pdb; pdb.set_trace()
         # TODO: get observed data on testing / who gets tested when??
         if any(self.symptoms) and self.rng.rand() < P_TEST:
             self.test_type = city.get_available_test()
-            if self.rng.rand() < TEST_TYPES[self.test_type]['P_FALSE_NEGATIVE']:
-                self.test_result =  'negative'
+            if self.infection_timestamp is None:
+                if self.rng.rand() < TEST_TYPES[self.test_type]['P_FALSE_POSITIVE']:
+                    self.test_result =  'positive'
+                else:
+                    self.test_result =  'negative'
             else:
-                self.test_result =  'positive'
+                if self.rng.rand() < TEST_TYPES[self.test_type]['P_FALSE_NEGATIVE']:
+                    self.test_result =  'negative'
+                else:
+                    self.test_result =  'positive'
 
             if self.test_type == "lab":
                 self.test_result_validated = True
@@ -992,26 +1030,26 @@ class Human(object):
                 self.symptom_start_time = self.env.timestamp
                 city.tracker.track_generation_times(self.name) # it doesn't count environmental infection or primary case or asymptomatic/presymptomatic infections; refer the definition
 
-            # log test
-            # TODO: needs better conditions; log test based on some condition on symptoms
-            if (self.test_result != "positive" and (
-                self.test_recommended or (
-                    self.is_incubated and self.env.timestamp - self.symptom_start_time >= datetime.timedelta(days=TEST_DAYS)
-                )
-            )):
-                if 0<= (self.env.timestamp - self.test_time).days < TEST_INTERVAL:
-                        warnings.warn(
-                            f"{self.name}'s last test time is less than {TEST_INTERVAL} days. Will not retest human today. "
-                            f"Current day {self.env.timestamp}, "
-                            f"Last test time {self.test_time}",
-                            RuntimeWarning
-                        )
-                # make testing a function of age/hospitalization/travel
-                elif self.get_tested(city):
-                    Event.log_test(self, self.env.timestamp)
-                    self.test_time = self.env.timestamp
-                    city.tracker.track_tested_results(self, self.test_result, self.test_type)
-                    self.update_risk(test_results=True)
+            # # log test
+            # # TODO: needs better conditions; log test based on some condition on symptoms
+            # if (self.test_result != "positive" and (
+            #     self.test_recommended or (
+            #         self.is_incubated and self.env.timestamp - self.symptom_start_time >= datetime.timedelta(days=TEST_DAYS)
+            #     )
+            # )):
+            #     if 0<= (self.env.timestamp - self.test_time).days < TEST_INTERVAL:
+            #             warnings.warn(
+            #                 f"{self.name}'s last test time is less than {TEST_INTERVAL} days. Will not retest human today. "
+            #                 f"Current day {self.env.timestamp}, "
+            #                 f"Last test time {self.test_time}",
+            #                 RuntimeWarning
+            #             )
+            #     # make testing a function of age/hospitalization/travel
+            #     elif self.get_tested(city):
+            #         Event.log_test(self, self.env.timestamp)
+            #         self.test_time = self.env.timestamp
+            #         city.tracker.track_tested_results(self, self.test_result, self.test_type)
+            #         self.update_risk(test_results=True)
 
             # recover
             if self.is_infectious and self.days_since_covid >= self.recovery_days:
@@ -1268,7 +1306,11 @@ class Human(object):
         initial_viral_load = 0
 
         if self.should_get_tested: # check for location is ICU or Hospital + symptoms
-            self.get_tested(city)
+            if self.get_tested(city):
+                Event.log_test(self, self.env.timestamp)
+                self.test_time = self.env.timestamp
+                city.tracker.track_tested_results(self, self.test_result, self.test_type)
+                self.update_risk(test_results=True)
 
         # accumulate time at household
         if location == self.household:
